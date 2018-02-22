@@ -42,9 +42,8 @@ defmodule Cryptocur.Blockchain do
     is_valid_rest =
       rest
       |> Enum.reverse()
-      |> Enum.with_index()
-      |> Enum.all?(fn {block, index} ->
-        Block.is_valid_block(block, Enum.at(blockchain, index - 1))
+      |> Enum.all?(fn block ->
+        Block.is_valid_block(block, Enum.at(blockchain, block.index - 1))
       end)
 
     is_valid_genesis_block and is_valid_rest

@@ -47,7 +47,7 @@ defmodule Cryptocur.Block do
           previous_hash: previous_hash,
           timestamp: timestamp,
           data: data
-        },
+        } = block,
         %Cryptocur.Block{} = prev_block
       )
       when is_integer(index) and is_binary(hash) and is_binary(previous_hash) and
@@ -55,6 +55,18 @@ defmodule Cryptocur.Block do
     index_valid = prev_block.index + 1 === index
     prev_hash_valid = prev_block.hash === previous_hash
     hash_valid = calc_hash(index, previous_hash, timestamp, data) === hash
+
+    unless index_valid do
+      IO.puts("Block #{inspect(block)} has an invalid index")
+    end
+
+    unless prev_hash_valid do
+      IO.puts("Block #{inspect(block)} has an invalid previous hash")
+    end
+
+    unless hash_valid do
+      IO.puts("Block #{inspect(block)} has an invalid hash")
+    end
 
     index_valid and prev_hash_valid and hash_valid
   end
