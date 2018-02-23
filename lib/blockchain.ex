@@ -4,6 +4,8 @@ defmodule Cryptocur.Blockchain do
   use GenServer
 
   @name :blockchain
+  @block_generation_interval 10
+  @difficulty_adjustment_interval 10
 
   defmodule State do
     defstruct blockchain: []
@@ -49,6 +51,38 @@ defmodule Cryptocur.Blockchain do
     is_valid_genesis_block and is_valid_rest
   end
 
+  defp get_difficulty(%Block{index: 0} = latest_block, _blockchain) do
+    latest_block.difficulty
+  end
+
+  defp get_difficulty(%Block{index: index} = latest_block, blockchain) do
+    case rem(index, @difficulty_adjustment_interval) do
+      0 -> get_adjusted_difficulty(latest_block, blockchain)
+      _ -> latest_block.difficulty
+    end
+  end
+
+  defp get_adjusted_difficulty(latest_block, blockchain) do
+    previous_adjustment_block =
+      Enum.at(blockchain, length(blockchain) - @difficulty_adjustment_interval)
+
+    time_expected = @block_generation_interval * @difficulty_adjustment_interval
+    time_taken = latest_block.timestamp - previous_adjustment_block.timestamp
+
+    cond do
+      time_taken < time_expected / 2 -> previous_adjustment_block.difficulty + 1
+      time_taken > time_expected * 2 -> previous_adjustment_block.difficulty - 1
+      true -> previous_adjustment_block.difficulty
+    end
+  end
+
+  defp get_accumulated_difficulty(blockchain) do
+    blockchain
+    |> Enum.map(fn block -> :math.pow(2, block.difficulty) end)
+    |> Enum.reduce(0, fn x, acc -> x + acc end)
+    |> round
+  end
+
   # Server Methods
 
   def get_blockchain() do
@@ -74,12 +108,17 @@ defmodule Cryptocur.Blockchain do
   # Handling calls, casts, and infos
 
   def handle_call(:get_blockchain, _from, %State{blockchain: blockchain} = state) do
+    diff = get_accumulated_difficulty(blockchain)
+    IO.puts("Diff: #{inspect(diff)}")
     {:reply, blockchain, state}
   end
 
   def handle_call({:generate_block, data}, _from, %State{blockchain: blockchain} = state) do
     latest_block = blockchain |> List.last()
-    block = Block.generate(latest_block, data)
+    difficulty = get_difficulty(latest_block, blockchain)
+    # The below should be somehow async? Not sure...
+    block = Block.generate(latest_block, data, difficulty)
+    IO.puts("Block #{inspect(block)} generated!")
     new_state = %{state | blockchain: blockchain ++ [block]}
     {:reply, block, new_state}
   end

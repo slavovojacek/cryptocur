@@ -7,6 +7,10 @@ defmodule Cryptocur.Block do
             difficulty: 0,
             nonce: 0
 
+  defp get_current_timestamp() do
+    System.system_time(:second)
+  end
+
   def calc_hash(index, previous_hash, timestamp, data, difficulty, nonce)
       when is_integer(index) and is_binary(previous_hash) and is_integer(timestamp) and
              is_binary(data) and is_integer(difficulty) and is_integer(nonce) do
@@ -35,11 +39,10 @@ defmodule Cryptocur.Block do
     :crypto.hash(:sha, payload)
   end
 
-  def generate(%Cryptocur.Block{index: previous_index, hash: previous_hash}, data)
+  def generate(%Cryptocur.Block{index: previous_index, hash: previous_hash}, data, difficulty)
       when is_binary(data) do
     index = previous_index + 1
-    timestamp = System.system_time(:second)
-    difficulty = 1
+    timestamp = get_current_timestamp()
 
     find(index, previous_hash, timestamp, data, difficulty, 0)
   end
@@ -54,14 +57,15 @@ defmodule Cryptocur.Block do
           difficulty: difficulty,
           nonce: nonce
         } = block,
-        %Cryptocur.Block{} = prev_block
+        %Cryptocur.Block{} = previous_block
       )
       when is_integer(index) and is_binary(hash) and is_binary(previous_hash) and
              is_integer(timestamp) and is_binary(data) and is_integer(difficulty) and
              is_integer(nonce) do
-    index_valid = prev_block.index + 1 === index
-    prev_hash_valid = prev_block.hash === previous_hash
+    index_valid = previous_block.index + 1 === index
+    prev_hash_valid = previous_block.hash === previous_hash
     hash_valid = calc_hash(index, previous_hash, timestamp, data, difficulty, nonce) === hash
+    is_valid_timestamp = is_valid_timestamp(block, previous_block)
 
     unless index_valid do
       IO.puts("Block #{inspect(block)} has an invalid index")
@@ -75,7 +79,17 @@ defmodule Cryptocur.Block do
       IO.puts("Block #{inspect(block)} has an invalid hash")
     end
 
-    index_valid and prev_hash_valid and hash_valid
+    unless is_valid_timestamp do
+      IO.puts("Block #{inspect(block)} has an invalid timestamp")
+    end
+
+    index_valid and prev_hash_valid and hash_valid && is_valid_timestamp
+  end
+
+  def is_valid_timestamp(%Cryptocur.Block{timestamp: timestamp}, %Cryptocur.Block{
+        timestamp: previous_timestamp
+      }) do
+    previous_timestamp - 60 < timestamp and timestamp - 60 < get_current_timestamp()
   end
 
   def hash_matches_difficulty(hash, difficulty) when is_binary(hash) and is_integer(difficulty) do
