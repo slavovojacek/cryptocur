@@ -108,8 +108,6 @@ defmodule Cryptocur.Blockchain do
   # Handling calls, casts, and infos
 
   def handle_call(:get_blockchain, _from, %State{blockchain: blockchain} = state) do
-    diff = get_accumulated_difficulty(blockchain)
-    IO.puts("Diff: #{inspect(diff)}")
     {:reply, blockchain, state}
   end
 
@@ -134,12 +132,17 @@ defmodule Cryptocur.Blockchain do
   end
 
   def handle_call({:replace_blockchain, blocks}, _from, %State{blockchain: blockchain} = state) do
-    cond do
-      validate_blockchain(blocks) and length(blocks) > length(blockchain) ->
+    case validate_blockchain(blocks) and
+           get_accumulated_difficulty(blocks) > get_accumulated_difficulty(blockchain) do
+      true ->
+        IO.puts(
+          "New blockchain is valid and has greater difficulty. Replacing current blockchain ..."
+        )
+
         new_state = %{state | blockchain: blocks}
         {:reply, :ok, new_state}
 
-      true ->
+      _ ->
         {:reply, :err, state}
     end
   end
