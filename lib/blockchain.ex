@@ -25,7 +25,7 @@ defmodule Cryptocur.Blockchain do
 
     timestamp = 1_519_294_957
     data = "Genesis Block"
-    hash = Block.calc_hash(block.index, block.previous_hash, timestamp, data)
+    hash = Block.calc_hash(block.index, block.previous_hash, timestamp, data, 0, 0)
 
     %{block | hash: hash, timestamp: timestamp, data: data}
   end
@@ -67,6 +67,12 @@ defmodule Cryptocur.Blockchain do
     GenServer.call(@name, :is_valid_blockchain)
   end
 
+  def replace_blockchain(blocks) do
+    GenServer.call(@name, {:replace_blockchain, blocks})
+  end
+
+  # Handling calls, casts, and infos
+
   def handle_call(:get_blockchain, _from, %State{blockchain: blockchain} = state) do
     {:reply, blockchain, state}
   end
@@ -86,5 +92,16 @@ defmodule Cryptocur.Blockchain do
   def handle_call(:is_valid_blockchain, _from, %State{blockchain: blockchain} = state) do
     res = validate_blockchain(blockchain)
     {:reply, res, state}
+  end
+
+  def handle_call({:replace_blockchain, blocks}, _from, %State{blockchain: blockchain} = state) do
+    cond do
+      validate_blockchain(blocks) and length(blocks) > length(blockchain) ->
+        new_state = %{state | blockchain: blocks}
+        {:reply, :ok, new_state}
+
+      true ->
+        {:reply, :err, state}
+    end
   end
 end

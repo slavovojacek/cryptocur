@@ -3,41 +3,45 @@ defmodule Cryptocur.Block do
             hash: nil,
             previous_hash: nil,
             timestamp: System.system_time(:second),
-            data: nil
+            data: nil,
+            difficulty: 0,
+            nonce: 0
 
-  def calc_hash(index, previous_hash, timestamp, data)
+  def calc_hash(index, previous_hash, timestamp, data, difficulty, nonce)
       when is_integer(index) and is_binary(previous_hash) and is_integer(timestamp) and
-             is_binary(data) do
+             is_binary(data) and is_integer(difficulty) and is_integer(nonce) do
     index = Integer.to_string(index)
     timestamp = Integer.to_string(timestamp)
+    difficulty = Integer.to_string(difficulty)
+    nonce = Integer.to_string(nonce)
 
-    payload = index <> previous_hash <> timestamp <> data
+    payload = index <> previous_hash <> timestamp <> data <> difficulty <> nonce
 
-    :crypto.hash(:sha, payload) |> Base.encode16()
+    # |> Base.encode16()
+    :crypto.hash(:sha, payload)
   end
 
-  def calc_hash(index, nil, timestamp, data)
-      when is_integer(index) and is_integer(timestamp) and is_binary(data) do
+  def calc_hash(index, nil, timestamp, data, difficulty, nonce)
+      when is_integer(index) and is_integer(timestamp) and is_binary(data) and
+             is_integer(difficulty) and is_integer(nonce) do
     index = Integer.to_string(index)
     timestamp = Integer.to_string(timestamp)
+    difficulty = Integer.to_string(difficulty)
+    nonce = Integer.to_string(nonce)
 
-    payload = index <> timestamp <> data
+    payload = index <> timestamp <> data <> difficulty <> nonce
 
-    :crypto.hash(:sha, payload) |> Base.encode16()
+    # |> Base.encode16()
+    :crypto.hash(:sha, payload)
   end
 
-  def generate(%Cryptocur.Block{index: prev_index, hash: prev_hash}, data) when is_binary(data) do
-    index = prev_index + 1
+  def generate(%Cryptocur.Block{index: previous_index, hash: previous_hash}, data)
+      when is_binary(data) do
+    index = previous_index + 1
     timestamp = System.system_time(:second)
-    hash = calc_hash(index, prev_hash, timestamp, data)
+    difficulty = 1
 
-    %Cryptocur.Block{
-      index: index,
-      hash: hash,
-      previous_hash: prev_hash,
-      timestamp: timestamp,
-      data: data
-    }
+    find(index, previous_hash, timestamp, data, difficulty, 0)
   end
 
   def is_valid_block(
@@ -46,15 +50,18 @@ defmodule Cryptocur.Block do
           hash: hash,
           previous_hash: previous_hash,
           timestamp: timestamp,
-          data: data
+          data: data,
+          difficulty: difficulty,
+          nonce: nonce
         } = block,
         %Cryptocur.Block{} = prev_block
       )
       when is_integer(index) and is_binary(hash) and is_binary(previous_hash) and
-             is_integer(timestamp) and is_binary(data) do
+             is_integer(timestamp) and is_binary(data) and is_integer(difficulty) and
+             is_integer(nonce) do
     index_valid = prev_block.index + 1 === index
     prev_hash_valid = prev_block.hash === previous_hash
-    hash_valid = calc_hash(index, previous_hash, timestamp, data) === hash
+    hash_valid = calc_hash(index, previous_hash, timestamp, data, difficulty, nonce) === hash
 
     unless index_valid do
       IO.puts("Block #{inspect(block)} has an invalid index")
@@ -69,5 +76,38 @@ defmodule Cryptocur.Block do
     end
 
     index_valid and prev_hash_valid and hash_valid
+  end
+
+  def hash_matches_difficulty(hash, difficulty) when is_binary(hash) and is_integer(difficulty) do
+    prefix = String.duplicate(<<0>>, difficulty)
+
+    case hash do
+      <<^prefix::binary-size(difficulty), _rest::binary>> -> true
+      _ -> false
+    end
+  end
+
+  def find(index, previous_hash, timestamp, data, difficulty, nonce)
+      when is_integer(index) and is_binary(previous_hash) and is_integer(timestamp) and
+             is_binary(data) and is_integer(difficulty) do
+    hash = calc_hash(index, previous_hash, timestamp, data, difficulty, nonce)
+
+    IO.puts("Trying #{inspect(hash)}")
+
+    case hash_matches_difficulty(hash, difficulty) do
+      true ->
+        %Cryptocur.Block{
+          index: index,
+          hash: hash,
+          previous_hash: previous_hash,
+          timestamp: timestamp,
+          data: data,
+          difficulty: difficulty,
+          nonce: nonce
+        }
+
+      _ ->
+        find(index, previous_hash, timestamp, data, difficulty, nonce + 1)
+    end
   end
 end
