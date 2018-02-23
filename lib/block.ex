@@ -106,7 +106,7 @@ defmodule Cryptocur.Block do
              is_binary(data) and is_integer(difficulty) do
     hash = calc_hash(index, previous_hash, timestamp, data, difficulty, nonce)
 
-    IO.puts("Trying #{inspect(hash)}")
+    # IO.puts("Trying #{inspect(hash)}")
 
     case hash_matches_difficulty(hash, difficulty) do
       true ->
