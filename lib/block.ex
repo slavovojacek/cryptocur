@@ -103,7 +103,7 @@ defmodule Cryptocur.Block do
 
   def find(index, previous_hash, timestamp, data, difficulty, nonce)
       when is_integer(index) and is_binary(previous_hash) and is_integer(timestamp) and
-             is_binary(data) and is_integer(difficulty) do
+             is_binary(data) and is_integer(difficulty) and is_integer(nonce) do
     hash = calc_hash(index, previous_hash, timestamp, data, difficulty, nonce)
 
     # IO.puts("Trying #{inspect(hash)}")

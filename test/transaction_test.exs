@@ -11,7 +11,7 @@ defmodule CryptocurTest.Transaction do
       outputs: [output]
     }
 
-    {:ok, txId} = Cryptocur.Transaction.get_transaction_id(tx)
+    txId = Cryptocur.Transaction.get_transaction_id(tx)
 
     assert is_binary(txId) == true
 
@@ -40,22 +40,102 @@ defmodule CryptocurTest.Transaction do
     amount = 3.14
 
     unspent_tx_outs = [
-      %Cryptocur.Transaction.UnspentTxOut{},
-      %Cryptocur.Transaction.UnspentTxOut{
+      %Cryptocur.Transaction.UnspentTxOutput{},
+      %Cryptocur.Transaction.UnspentTxOutput{
         out_id: transaction_id,
         out_index: index,
         address: address,
         amount: amount
       },
-      %Cryptocur.Transaction.UnspentTxOut{}
+      %Cryptocur.Transaction.UnspentTxOutput{}
     ]
 
     unspent_tx_out =
-      Cryptocur.Transaction.find_unspent_tx_out(transaction_id, index, unspent_tx_outs)
+      Cryptocur.Transaction.find_unspent_tx_output(transaction_id, index, unspent_tx_outs)
 
     assert unspent_tx_out.out_id == transaction_id
     assert unspent_tx_out.out_index == index
     assert unspent_tx_out.address == address
     assert unspent_tx_out.amount == amount
+  end
+
+  test "updates" do
+    new_transactions = [
+      %Cryptocur.Transaction.Tx{
+        id: "",
+        inputs: [
+          %Cryptocur.Transaction.TxInput{
+            out_id: "id",
+            out_index: 42
+          }
+        ],
+        outputs: [
+          %Cryptocur.Transaction.TxOutput{
+            address: "addr",
+            amount: 3.14
+          }
+        ]
+      }
+    ]
+
+    Cryptocur.Transaction.update_unspent_tx_outputs(new_transactions, [])
+    |> IO.inspect()
+  end
+
+  test "correctly sums transaction inputs" do
+    unspent_tx_outputs = [
+      %Cryptocur.Transaction.UnspentTxOutput{out_id: "a", out_index: 0, amount: 3.14},
+      %Cryptocur.Transaction.UnspentTxOutput{out_id: "b", out_index: 1, amount: 42},
+      %Cryptocur.Transaction.UnspentTxOutput{out_id: "c", out_index: 2, amount: 0.001592}
+    ]
+
+    transaction = %Cryptocur.Transaction.Tx{
+      inputs: [
+        %Cryptocur.Transaction.TxInput{out_id: "a", out_index: 0},
+        %Cryptocur.Transaction.TxInput{out_id: "b", out_index: 1},
+        %Cryptocur.Transaction.TxInput{out_id: "c", out_index: 0}
+      ]
+    }
+
+    assert Cryptocur.Transaction.get_tx_input_total(transaction, unspent_tx_outputs) === 45.14
+  end
+
+  test "correctly sums transaction outputs" do
+    transaction = %Cryptocur.Transaction.Tx{
+      outputs: [
+        %Cryptocur.Transaction.TxOutput{amount: 3.14},
+        %Cryptocur.Transaction.TxOutput{amount: 42},
+        %Cryptocur.Transaction.TxOutput{amount: 0.001592}
+      ]
+    }
+
+    assert Cryptocur.Transaction.get_tx_output_total(transaction) === 45.141592
+  end
+
+  test "validates transaction input" do
+    {:ok, {private_key, address}} = RsaEx.generate_keypair()
+
+    input = %Cryptocur.Transaction.TxInput{out_id: "abc", out_index: 42}
+
+    transaction = %Cryptocur.Transaction.Tx{inputs: [input], outputs: []}
+    tx_id = Cryptocur.Transaction.get_transaction_id(transaction)
+    transaction = %{transaction | id: tx_id}
+
+    unspent_tx_outputs = [
+      %Cryptocur.Transaction.UnspentTxOutput{
+        out_id: "abc",
+        out_index: 42,
+        address: address,
+        amount: 3.14
+      }
+    ]
+
+    {:ok, signature} =
+      Cryptocur.Transaction.sign_tx_id(transaction, 0, private_key, unspent_tx_outputs)
+
+    input = %{input | signature: signature}
+
+    Cryptocur.Transaction.validate_transaction_input(input, transaction, unspent_tx_outputs)
+    |> IO.inspect()
   end
 end

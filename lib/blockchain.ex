@@ -8,7 +8,7 @@ defmodule Cryptocur.Blockchain do
   @difficulty_adjustment_interval 10
 
   defmodule State do
-    defstruct blockchain: []
+    defstruct blockchain: [], unspent_transaction_outputs: []
   end
 
   def start_link(_arg) do
