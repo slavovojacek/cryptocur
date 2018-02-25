@@ -15,6 +15,8 @@ defmodule Cryptocur.Transaction do
     defstruct out_id: nil, out_index: 0, address: nil, amount: 0
   end
 
+  @coinbase_amount 50.0
+
   def get_transaction_id(%Tx{inputs: inputs, outputs: outputs}) do
     txInContent =
       inputs
@@ -106,7 +108,10 @@ defmodule Cryptocur.Transaction do
     input_total = get_tx_input_total(inputs, unspent_tx_outputs)
     output_total = get_tx_output_total(outputs)
 
-    is_valid_transaction_id and valid_inputs and input_total === output_total
+    case is_valid_transaction_id and valid_inputs and input_total === output_total do
+      true -> {:ok, "Valid"}
+      _ -> {:err, "Invalid"}
+    end
   end
 
   def validate_transaction_input(
@@ -119,6 +124,22 @@ defmodule Cryptocur.Transaction do
       _ -> {:err, "Referenced transaction output not found: #{inspect(input)}"}
     end
   end
+
+  def validate_coinbase_transaction(
+        %Tx{id: id, inputs: [input], outputs: [output]} = transaction,
+        block_index
+      ) do
+    is_valid_transaction_id = get_transaction_id(transaction) == id
+    is_valid_index = input.out_index == block_index
+    is_valid_output_amount = output.amount == @coinbase_amount
+
+    case is_valid_transaction_id and is_valid_index and is_valid_output_amount do
+      true -> {:ok, "Valid"}
+      _ -> {:err, "Invalid"}
+    end
+  end
+
+  def validate_coinbase_transaction(_, _), do: {:err, "Invalid"}
 
   def get_tx_input_total(%Tx{inputs: inputs}, unspent_tx_outputs) do
     inputs

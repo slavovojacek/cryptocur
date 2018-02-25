@@ -138,4 +138,32 @@ defmodule CryptocurTest.Transaction do
     Cryptocur.Transaction.validate_transaction_input(input, transaction, unspent_tx_outputs)
     |> IO.inspect()
   end
+
+  test "correctly validates a coinbase transaction" do
+    block_index = 42
+    input = %Cryptocur.Transaction.TxInput{out_id: "abc", out_index: block_index}
+    output = %Cryptocur.Transaction.TxOutput{address: "def", amount: 50.0}
+
+    transaction = %Cryptocur.Transaction.Tx{inputs: [input], outputs: [output]}
+    tx_id = Cryptocur.Transaction.get_transaction_id(transaction)
+    transaction = %{transaction | id: tx_id}
+
+    res = Cryptocur.Transaction.validate_coinbase_transaction(transaction, block_index)
+
+    assert res == {:ok, "Valid"}
+  end
+
+  test "correctly invalidates a coinbase transaction" do
+    block_index = 42
+    input = %Cryptocur.Transaction.TxInput{out_id: "abc", out_index: block_index}
+    output = %Cryptocur.Transaction.TxOutput{address: "def", amount: 50.0}
+
+    transaction = %Cryptocur.Transaction.Tx{inputs: [input, input], outputs: [output]}
+    tx_id = Cryptocur.Transaction.get_transaction_id(transaction)
+    transaction = %{transaction | id: tx_id}
+
+    res = Cryptocur.Transaction.validate_coinbase_transaction(transaction, block_index)
+
+    assert res == {:err, "Invalid"}
+  end
 end

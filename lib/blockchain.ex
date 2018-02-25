@@ -114,8 +114,8 @@ defmodule Cryptocur.Blockchain do
   def handle_call({:generate_block, data}, _from, %State{blockchain: blockchain} = state) do
     latest_block = blockchain |> List.last()
     difficulty = get_difficulty(latest_block, blockchain)
-    # The below should be somehow async? Not sure...
-    block = Block.generate(latest_block, data, difficulty)
+    # Not sure async/await adds much value here..
+    block = Task.await(Block.generate(latest_block, data, difficulty))
     IO.puts("Block #{inspect(block)} generated!")
     new_state = %{state | blockchain: blockchain ++ [block]}
     {:reply, block, new_state}

@@ -44,7 +44,7 @@ defmodule Cryptocur.Block do
     index = previous_index + 1
     timestamp = get_current_timestamp()
 
-    find(index, previous_hash, timestamp, data, difficulty, 0)
+    Task.async(__MODULE__, :find, [index, previous_hash, timestamp, data, difficulty, 0])
   end
 
   def is_valid_block(
