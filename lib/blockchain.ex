@@ -1,5 +1,6 @@
 defmodule Cryptocur.Blockchain do
   alias Cryptocur.Block
+  alias Cryptocur.ProofOfWork
 
   use GenServer
 
@@ -27,7 +28,7 @@ defmodule Cryptocur.Blockchain do
 
     timestamp = 1_519_294_957
     data = "Genesis Block"
-    hash = Block.calc_hash(block.index, block.previous_hash, timestamp, data, 0, 0)
+    hash = ProofOfWork.calc_hash(block.index, block.previous_hash, timestamp, data, 0, 0)
 
     %{block | hash: hash, timestamp: timestamp, data: data}
   end
@@ -40,7 +41,7 @@ defmodule Cryptocur.Blockchain do
 
     is_valid_genesis_block = hash === genuine_hash
 
-    # TODO Eventually use gen stage and flow
+    # TODO Eventually use gen stage and flow?
     is_valid_rest =
       rest
       |> Enum.reverse()
@@ -90,7 +91,9 @@ defmodule Cryptocur.Blockchain do
   end
 
   def generate_block(data) do
-    GenServer.call(@name, {:generate_block, data})
+    # @TODO If this takes 10 seconds to compute, any subsequent
+    # call to this module will be blocked! WTF? Investigate.
+    GenServer.cast(@name, {:generate_block, data})
   end
 
   def get_latest_block() do
@@ -109,16 +112,6 @@ defmodule Cryptocur.Blockchain do
 
   def handle_call(:get_blockchain, _from, %State{blockchain: blockchain} = state) do
     {:reply, blockchain, state}
-  end
-
-  def handle_call({:generate_block, data}, _from, %State{blockchain: blockchain} = state) do
-    latest_block = blockchain |> List.last()
-    difficulty = get_difficulty(latest_block, blockchain)
-    # Not sure async/await adds much value here..
-    block = Task.await(Block.generate(latest_block, data, difficulty))
-    IO.puts("Block #{inspect(block)} generated!")
-    new_state = %{state | blockchain: blockchain ++ [block]}
-    {:reply, block, new_state}
   end
 
   def handle_call(:get_latest_block, _from, %State{blockchain: blockchain} = state) do
@@ -145,5 +138,14 @@ defmodule Cryptocur.Blockchain do
       _ ->
         {:reply, :err, state}
     end
+  end
+
+  def handle_cast({:generate_block, data}, %State{blockchain: blockchain} = state) do
+    latest_block = blockchain |> List.last()
+    difficulty = get_difficulty(latest_block, blockchain)
+    block = Block.generate(latest_block, data, difficulty)
+    IO.puts("Block #{inspect(block)} generated!")
+    new_state = %{state | blockchain: blockchain ++ [block]}
+    {:noreply, new_state}
   end
 end
